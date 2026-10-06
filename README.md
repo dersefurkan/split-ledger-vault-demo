@@ -126,4 +126,4 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-Vault and matching-engine pre-ship tests. Contact: Telegram [@FURY_Fn](https://t.me/FURY_Fn) · dersefurkan32@gmail.com
+Hired version of this shape: one contract, five days, $1,500, private Foundry repo. [dersefurkan.github.io](https://dersefurkan.github.io) · Telegram [@FURY_Fn](https://t.me/FURY_Fn) · dersefurkan32@gmail.com
