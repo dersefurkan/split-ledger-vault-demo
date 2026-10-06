@@ -69,14 +69,24 @@ contract BoundHandler {
         deposited += amount;
     }
 
+    function withdrawShares(uint96 amount) external {
+        uint256 open = vault.shares(address(this));
+        if (open == 0) return;
+        if (open > type(uint96).max) open = type(uint96).max;
+        amount = uint96(boundAmount(amount, 1, open));
+        vault.withdrawShares(amount);
+        withdrawn += amount;
+    }
+
     function redeemReceipt(uint256 id) external {
         uint256 n = vault.receiptCount();
         if (n == 0) return;
         id = id % n;
-        (address owner, uint256 amount, bool spent) = vault.receipts(id);
-        if (spent || owner != address(this)) return;
+        (address owner, uint256 amount, uint256 paid) = vault.receipts(id);
+        if (paid >= amount || owner != address(this)) return;
+        uint256 due = amount - paid;
         vault.redeemReceipt(id);
-        withdrawn += amount;
+        withdrawn += due;
     }
 
     function boundAmount(uint256 x, uint256 lo, uint256 hi) internal pure returns (uint256) {
@@ -85,23 +95,33 @@ contract BoundHandler {
     }
 }
 
-/// Conservation invariants on the bound vault. These MUST hold.
+/// Two actors, both exits. These MUST hold on the bound vault.
 contract BoundLedgerInvariant is Test {
-    BoundHandler internal handler;
+    BoundHandler internal alice;
+    BoundHandler internal bob;
 
     function setUp() public {
         MockAsset asset = new MockAsset();
         ReceiptBoundVault vault = new ReceiptBoundVault(asset);
-        handler = new BoundHandler(vault, asset);
-        targetContract(address(handler));
+        alice = new BoundHandler(vault, asset);
+        bob = new BoundHandler(vault, asset);
+        targetContract(address(alice));
+        targetContract(address(bob));
     }
 
-    function invariant_withdrawals_cannot_exceed_deposits() public view {
-        assertLe(handler.withdrawn(), handler.deposited());
+    function invariant_neither_actor_extracts() public view {
+        assertLe(alice.withdrawn(), alice.deposited());
+        assertLe(bob.withdrawn(), bob.deposited());
     }
 
-    function invariant_vault_covers_unredeemed_shares() public view {
-        uint256 backing = handler.asset().balanceOf(address(handler.vault()));
-        assertEq(backing, handler.deposited() - handler.withdrawn());
+    /// One actor's global total can hide the other actor's loss. The backing
+    /// check is against both actors together, and against the receipt sum.
+    function invariant_backing_matches_both_actors() public view {
+        uint256 deposited = alice.deposited() + bob.deposited();
+        uint256 withdrawn = alice.withdrawn() + bob.withdrawn();
+        ReceiptBoundVault vault = alice.vault();
+        assertEq(vault.asset().balanceOf(address(vault)), deposited - withdrawn);
+        assertEq(vault.totalOpen(), deposited - withdrawn);
+        assertEq(vault.openClaims(), vault.totalOpen());
     }
 }

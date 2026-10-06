@@ -43,18 +43,32 @@ forge test --match-contract SplitLedgerPoC -vv
 
 ## The fix, proven the same way
 
-`ReceiptBoundVault` binds both ledgers to one identity: redeem burns the receipt **and** the share credit. `withdrawShares` is removed.
+`ReceiptBoundVault` keeps both exits. They spend one balance. `shares` is what is still claimable. Each receipt stores how much of it was already paid. `withdrawShares` spends receipts oldest-first. `redeemReceipt` pays only that receipt's remainder.
+
+```bash
+forge test --match-test test_bound_share_exit_then_receipt_pays_only_the_rest -vv
+```
+
+```
+[PASS] test_bound_share_exit_then_receipt_pays_only_the_rest()
+    share exit pays 40
+    receipt exit pays 60, not the original 100
+    the other depositor still withdraws 100
+```
+
+Deleting `withdrawShares` would also stop the double pay. That is not the fix. Production keeps both doors. The bound vault does too.
 
 ```bash
 forge test --match-contract BoundLedgerInvariant -vv
 ```
 
-Stateful fuzzing (`runs = 64`, `depth = 12`) drives random deposit/redeem sequences. After every call:
+Stateful fuzzing (`runs = 64`, `depth = 12`) drives two actors through both exits. After every call:
 
-1. `withdrawn ≤ deposited` — no value created
-2. `vault balance == deposited − withdrawn` — ledger and backing never diverge
+1. Neither actor has withdrawn more than they deposited.
+2. Vault balance equals both actors' deposits minus withdrawals.
+3. The receipt sum (`openClaims`) equals the counter (`totalOpen`). A share exit that forgot to mark receipts paid breaks this even when the token balance still looks fine.
 
-Both hold on the bound vault. The directed PoC shows the split vault violating the same conservation rule.
+The directed PoC shows the split vault violating conservation. The same sequences hold on the bound vault.
 
 ## Shape 2 — the missing claimed cursor
 
