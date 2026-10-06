@@ -121,7 +121,7 @@ test/Invariant.t.sol        # handler + bound-vault invariants
 test/EpochQueueInvariant.t.sol  # queue handler + invariants (killed variant gated)
 ```
 
-`forge test` — 20 passed, 1 gated suite skipped.
+`forge test` — 19 passed, 1 gated suite skipped.
 
 ## What a full engagement adds
 
